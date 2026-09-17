@@ -276,4 +276,5 @@ mine = data.xmat[b].reshape(3,3) @ model.jnt_axis[0]
 print(np.allclose(mine, data.xaxis[0], atol=1e-12))   # → True
 ```
 
-详细方法见 `docs/教案/04-卡住时怎么办.md`。
+卡住了就按"探索式编程"四步来：`print` 看长相 → `type` 看类型 → `dir` 看有什么 → `shape` 看形状。
+（这一条的详细做法见 `从这里开始.md` 的"纪律"一节。）

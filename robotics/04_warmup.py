@@ -2,14 +2,14 @@
 热身关卡 · 从零搭台阶到 EX5
 ================================================================
 为什么有这个文件：
-  exercises.py 从 EX4 开始，一道题就要同时用 5 个你还没见过的 API。
+  05_exercises.py 从 EX4 开始，一道题就要同时用 5 个你还没见过的 API。
   那不是"难"，是"跳步"。这个文件把台阶拆开，一级只加一个新东西。
 
 用法：
   一次只做一级。做完一级立刻运行看结果，通过了再做下一级。
   每级都给了确切的字段名 —— 你不需要猜 API，只需要想清楚逻辑。
 
-运行：python robotics/warmup.py
+运行：python robotics/04_warmup.py
 ================================================================
 """
 
@@ -215,7 +215,7 @@ def level10_dist_to_line(P, A, u):
 def level11_lever_arm(joint_index):
     """目标：返回末端 hand 到关节 joint_index 转轴的垂直距离（力臂 r）。
 
-    这就是 exercises.py 里 EX5 要的东西。你现在已经集齐所有零件了：
+    这就是 05_exercises.py 里 EX5 要的东西。你现在已经集齐所有零件了：
 
       第 9 级  → 转轴经过的点 A
       第 8 级  → 转轴的方向 u（记得换成 joint_index）
@@ -226,7 +226,27 @@ def level11_lever_arm(joint_index):
           注意用 joint_index 替换掉写死的 0。
     """
     ######## TODO ########
-    return None
+    hand_id = mujoco.mj_name2id(model,mujoco.mjtObj.mjOBJ_BODY,"hand")
+    hand_pos = data.xpos[hand_id]
+    hand_mat = data.xmat[hand_id]
+
+    body_id = model.jnt_bodyid[joint_index]
+    jnt_axis = model.jnt_axis[joint_index]
+    jnt_pos = model.jnt_pos[joint_index]
+    body_mat = data.xmat[body_id].reshape(3,3)
+    body_pos = data.xpos[body_id]
+
+    #计算轴的世界坐标系
+    jnt_world_pos = body_pos + body_mat @ jnt_pos
+    #计算轴的世界方向
+    jnt_world_axis = body_mat @ jnt_axis
+    u = jnt_world_axis
+    #计算力臂 计算点到直线的方向
+    u = u / np.linalg.norm(u)
+    v = jnt_world_pos - hand_pos
+    proj = np.dot(u, v) * u
+    lever_arm = np.linalg.norm(v - proj)
+    return lever_arm
 
 
 # ==================== 第 12 级：手写欧拉积分 ====================
@@ -245,7 +265,10 @@ def level12_euler(n_steps, dt):
     """
     z, v, g = 10.0, 0.0, -9.81
     ######## TODO ########
-    return None
+    for i in range(n_steps):
+        v = v + g * dt
+        z = z + v * dt
+    return z
 
 
 # ==================== 自动检查（不要改）====================
@@ -280,7 +303,7 @@ def _run(no, title, fn, want, tol=1e-9, note=""):
 
 def main():
     print("\n" + "=" * 64)
-    print("  热身关卡（做完这个再去 exercises.py）")
+    print("  热身关卡（做完这个再去 05_exercises.py）")
     print("=" * 64)
 
     mujoco.mj_forward(model, data)
@@ -341,7 +364,7 @@ def main():
     print("\n" + "=" * 64)
     print(f"  完成度：{n} / {len(r)}")
     if n == len(r):
-        print("  全过了 🎉 现在去 exercises.py，你会发现 EX1~EX7 变得简单了。")
+        print("  全过了 🎉 现在去 05_exercises.py，你会发现 EX1~EX7 变得简单了。")
     else:
         print("  还没全过。一次只攻一级，卡住了看那一级的提示。")
     print("=" * 64 + "\n")

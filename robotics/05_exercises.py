@@ -4,14 +4,16 @@
 用法：
   1. 找到标着 ######## TODO ######## 的地方
   2. 用你自己的代码把 return 后面补上（别改函数名和参数）
-  3. 运行 python robotics/exercises.py
+  3. 运行 python robotics/05_exercises.py
   4. 全部通过会打印 PASS
 
-对应教案：
-  docs/教案/01-MuJoCo是什么.md
-  docs/教案/03-实验原理.md
+对应课程（在课程/ 目录里）：
+  课程/第04课-用名字找到编号.md      读位置
+  课程/第05课-朝向为什么是9个数.md     读朝向
+  课程/第08课-局部坐标和世界坐标.md    局部 → 世界
+  课程/第11课-力臂.md                EX5 的完整拆解
 
-规则：先自己写。卡住了再回去看教案对应章节，不要直接问答案。
+规则：先自己写。卡住了再回去看课程/里的对应章节，不要直接问答案。
 ================================================================
 """
 
@@ -108,7 +110,7 @@ def ex6_predict_displacement(joint_index, theta):
     """用「力臂 × 转角」预测：单独把 joint_index 转 theta 弧度后，末端移动多远。
 
     提示：直接复用 ex5_lever_arm 的结果。
-          教案第 3 课第 4 节讲过这个近似是怎么来的。
+          近似公式：位移 ≈ 力臂 × 转角（课程/第11课讲过力臂）。
     """
     ######## TODO ########
     return None
@@ -118,8 +120,8 @@ def ex6_predict_displacement(joint_index, theta):
 def ex7_free_fall_euler(n_steps, dt):
     """手写欧拉积分，模拟自由落体，返回第 n_steps 步之后的 z 高度。
 
-    这是本套题里唯一一道"脱离 MuJoCo"的题，让你亲手体验第 1 课第 2 节
-    那个四步循环到底在算什么。
+    这是本套题里唯一一道"脱离 MuJoCo"的题。
+    课程/第12课讲过：仿真就是"一小步一小步地算"。
 
     设定：小球从 z = 10.0 开始，初速度 0，重力 g = -9.81，时间步 dt。
           一共走 n_steps 步。忽略空气阻力，不撞地。
@@ -136,7 +138,23 @@ def ex7_free_fall_euler(n_steps, dt):
 
 # ==================== 下面是自动检查，不要改 ====================
 
+class _Err:
+    """把这个函数报的错装起来，交给 _check 统一显示，不让它中断整个程序。"""
+    def __init__(self, e):
+        self.e = e
+
+
+def _safe(fn, *args):
+    try:
+        return fn(*args)
+    except Exception as e:
+        return _Err(e)
+
+
 def _check(label, got, want, tol=1e-9):
+    if isinstance(got, _Err):
+        print(f"  {label:<34} ❌ 你的函数报错了：{type(got.e).__name__}: {got.e}")
+        return False
     if got is None:
         print(f"  {label:<34} ⬜ 还没写")
         return False
@@ -162,16 +180,16 @@ def main():
     results = []
 
     print("\n[EX1] qpos 的长度")
-    results.append(_check("len(qpos)", ex1_state_vector_size(), model.nq))
+    results.append(_check("len(qpos)", _safe(ex1_state_vector_size, data), model.nq))
 
     print("\n[EX2] 手臂关节数")
-    results.append(_check("手臂关节数", ex2_no_arm_joints(), N_ARM_JOINTS))
+    results.append(_check("手臂关节数", _safe(ex2_no_arm_joints), N_ARM_JOINTS))
 
     print("\n[EX3] 设置关节角并读取末端位置")
     test_angles = [0.3, -0.5, 0.2, -1.0, 0.4, 1.2, 0.6]
     set_arm(test_angles)
     want_pos = data.xpos[HAND_ID].copy()
-    got_pos = ex3_set_and_get_hand(test_angles)
+    got_pos = _safe(ex3_set_and_get_hand, test_angles)
     results.append(_check("hand 世界坐标", got_pos, want_pos, tol=1e-6))
 
     print("\n[EX4] 关节转轴上的世界坐标点")
@@ -180,7 +198,7 @@ def main():
     for j in range(N_ARM_JOINTS):
         body = model.jnt_bodyid[j]
         want = data.xpos[body] + data.xmat[body].reshape(3, 3) @ model.jnt_pos[j]
-        ok4 &= _check(f"joint{j + 1} 转轴 anchor", ex4_joint_anchor(j), want, tol=1e-6)
+        ok4 &= _check(f"joint{j + 1} 转轴 anchor", _safe(ex4_joint_anchor, j), want, tol=1e-6)
     results.append(ok4)
 
     print("\n[EX5] 力臂：末端到各关节转轴的垂直距离")
@@ -194,7 +212,7 @@ def main():
         u = u / np.linalg.norm(u)
         v = p_hand - A
         want = float(np.linalg.norm(v - np.dot(v, u) * u))
-        ok5 &= _check(f"joint{j + 1} 力臂 r", ex5_lever_arm(j), want, tol=1e-6)
+        ok5 &= _check(f"joint{j + 1} 力臂 r", _safe(ex5_lever_arm, j), want, tol=1e-6)
     results.append(ok5)
 
     print("\n[EX6] 用「力臂 × 转角」预测位移，并和 MuJoCo 实测对比（误差 < 1%）")
@@ -207,7 +225,11 @@ def main():
         angles[j] = theta
         set_arm(angles)
         actual = float(np.linalg.norm(data.xpos[HAND_ID] - base))
-        pred = ex6_predict_displacement(j, theta)
+        pred = _safe(ex6_predict_displacement, j, theta)
+        if isinstance(pred, _Err):
+            print(f"  joint{j + 1}: ❌ 你的函数报错了：{type(pred.e).__name__}: {pred.e}")
+            ok6 = False
+            continue
         if pred is None:
             print(f"  joint{j + 1}: ⬜ 还没写")
             ok6 = False
@@ -237,7 +259,7 @@ def main():
     for _ in range(n_steps):
         mujoco.mj_step(m2, d2)
     want_z = float(d2.qpos[2])
-    got_z = ex7_free_fall_euler(n_steps, dt)
+    got_z = _safe(ex7_free_fall_euler, n_steps, dt)
     ok7 = _check(f"{n_steps} 步后的 z 高度", got_z, want_z, tol=1e-3)
     if ok7:
         print(f"      MuJoCo 用的也是这个积分顺序（先更新速度，再更新位置），")
