@@ -61,10 +61,11 @@ def ex2_no_arm_joints():
           可以从 model.jnt_type 入手：转动关节和滑动关节的类型编号不一样。
     """
     ######## TODO ########
-    for i in range (9):
-        if model.jnt_type[i] == joint:
+    print(model.jnt_type)
+    flag = 0
+    for i in range (len(model.jnt_type)):
+        if model.jnt_type[i] == 3:
             flag += 1
-
     return flag
 
 
@@ -75,7 +76,9 @@ def ex3_set_and_get_hand(angles):
     提示：先调用上面的 set_arm，再读某个字段。
     """
     ######## TODO ########
-    return None
+    hand_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "hand")
+    hand_pos = data.xpos[hand_id]
+    return hand_pos
 
 
 # EX4 ------------------------------------------------------------------
@@ -88,7 +91,14 @@ def ex4_joint_anchor(joint_index):
           注意 xmat 是展开成 9 个数的 3×3 矩阵，要 reshape(3, 3) 才能做矩阵乘法。
     """
     ######## TODO ########
-    return None
+    jnt_pos = model.jnt_pos[joint_index]
+    body_id = model.jnt_bodyid[joint_index]
+    body_pos = data.xpos[body_id]
+    body_mat = data.xmat[body_id].reshape(3,3)
+
+    jnt_world_pos = body_pos + body_mat @ jnt_pos
+
+    return jnt_world_pos
 
 
 # EX5 ------------------------------------------------------------------
@@ -102,7 +112,29 @@ def ex5_lever_arm(joint_index):
           记得先做一次 set_arm([0]*7) 让状态干净。
     """
     ######## TODO ########
-    return None
+    hand_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, "hand")
+
+    hand_pos = data.xpos[hand_id]
+    hand_mat = data.xmat[hand_id]
+
+    jnt_pos = model.jnt_pos[joint_index]
+    jnt_axis = model.jnt_axis[joint_index]
+
+    body_id = model.jnt_bodyid[joint_index]
+    body_pos = data.xpos[body_id]
+    body_mat = data.xmat[body_id].reshape(3,3)
+
+    #轴的世界坐标
+    jnt_world_pos = body_pos + body_mat @ jnt_pos
+    #轴的世界方向
+    jnt_world_axis = body_mat @ jnt_axis
+    u = jnt_world_axis
+
+    u = u / np.linalg.norm(u)
+    v = jnt_world_pos - hand_pos
+    proj = np.dot(u, v) * u
+    lever_arm = v - proj
+    return np.linalg.norm(lever_arm)
 
 
 # EX6 ------------------------------------------------------------------
@@ -113,7 +145,9 @@ def ex6_predict_displacement(joint_index, theta):
           近似公式：位移 ≈ 力臂 × 转角（课程/第11课讲过力臂）。
     """
     ######## TODO ########
-    return None
+    lever_arm = ex5_lever_arm(joint_index=joint_index)
+    displacement = lever_arm * theta
+    return displacement
 
 
 # EX7 ------------------------------------------------------------------
@@ -133,7 +167,10 @@ def ex7_free_fall_euler(n_steps, dt):
     v = 0.0
     g = -9.81
     ######## TODO ########
-    return None
+    for i in range(n_steps):
+        v = v + g * dt
+        z = z + v * dt
+    return z
 
 
 # ==================== 下面是自动检查，不要改 ====================
